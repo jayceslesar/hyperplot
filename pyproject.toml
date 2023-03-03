@@ -14,7 +14,8 @@ requires-python = ">=3.9"
 
 dependencies = [
   "tsdownsample>=0.1.1",
-  "polars"
+  "polars",
+  "plotly",
 ]
 
 [project.optional-dependencies]
