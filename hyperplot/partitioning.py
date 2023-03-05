@@ -36,6 +36,8 @@ def partition_df(
         raise ValueError(f"'levels' must be > 1. Got {levels}.")
 
     # convert everything to UNIX time including nanoseconds
+    # TODO: make sure this actually works for messy timestamps
+    # Ideally this is written as nanoseconds so we can support high frequency stuff
     df = df.with_columns([pl.col("timestamp").cast(pl.Datetime(time_unit="ns"))])
 
     first = df["timestamp"].min().timestamp()
