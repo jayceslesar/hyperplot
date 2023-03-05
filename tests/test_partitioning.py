@@ -1,20 +1,40 @@
 """Tests for partitioning."""
 
-import pytest
+import os
 from datetime import datetime, timedelta
 
-from hyperplot import partitioning
-
-import polars as pl
 import numpy as np
+import polars as pl
+import pytest
+
+from hyperplot.partitioning import partition_df
 
 
 @pytest.fixture()
-def day_data() -> pl.DataFrame:
-    """24 Hours of Data."""
+def week_data() -> pl.DataFrame:
+    """1 week of 1hz Data."""
     low = datetime(2023, 1, 1)
-    high = datetime(2023, 1, 2)
+    high = datetime(2023, 1, 8)
     interval = timedelta(seconds=1)
 
     timestamp = pl.date_range(low, high, interval)
     value = np.sin(2 * np.pi * 1000 * np.arange(len(timestamp)) / len(timestamp))
+    df = pl.DataFrame(
+        {
+            "timestamp": timestamp,
+            "value": value,
+        }
+    )
+    yield df
+
+
+@pytest.mark.parametrize("df", ["week_data"])
+def test_partition_df(df, request, tmpdir):
+    df = request.getfixturevalue(df)
+    signal_name = "test_signal"
+    partition_path = str(tmpdir)
+    outer_path = os.path.join(partition_path, signal_name)
+    partition_df(df, partition_path, signal_name)
+    assert len(os.listdir(outer_path)) == 7
+    for path in os.listdir(outer_path):
+        assert len(os.listdir(os.path.join(outer_path, path))) == 10
