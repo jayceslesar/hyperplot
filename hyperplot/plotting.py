@@ -82,6 +82,7 @@ class HyperPlotter:
                 return fig
             for channel in channels:
                 paths, start, end = self._solve_partitions(channel, relay_data)
+                # this can be threaded for sure
                 df = pl.concat([pl.read_parquet(path) for path in paths])
                 if start:
                     df = df.filter(pl.col("timestamp") >= datetime.fromtimestamp(start))
