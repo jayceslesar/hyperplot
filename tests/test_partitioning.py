@@ -19,7 +19,7 @@ def week_data() -> pl.DataFrame:
 
     timestamp = pl.date_range(low, high, interval)
     length = np.pi * 2 * 1000
-    value = np.cos(np.arange(0, length, length / len(timestamp)))
+    value = np.sin(np.arange(0, length, length / len(timestamp)))
     df = pl.DataFrame(
         {
             "timestamp": timestamp,
