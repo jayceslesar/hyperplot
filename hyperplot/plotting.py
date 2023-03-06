@@ -101,12 +101,10 @@ class HyperPlotter:
         solution_paths = []
         partitions = self.get_channel_partitions(channel)
         if relay_data.get("autosize", None) or relay_data.get("xaxis.autorange", None):
-            level = "10"
             start = None
             end = None
             solution_partitions = partitions
         else:
-            level = "10"
             # :23 here because datetime cant handle it
             start = datetime.fromisoformat(relay_data["xaxis.range[0]"][:23]).timestamp()
             end = datetime.fromisoformat(relay_data["xaxis.range[1]"][:23]).timestamp()
@@ -119,6 +117,11 @@ class HyperPlotter:
                 solution_partitions = [partitions[one_before_idx]] + solution_partitions
 
         for solution_partition in solution_partitions:
+            # this needs to be optimized by hertz somehow but we dont really care as we put 100k points in a partition as of now
+            if len(solution_partitions) >= 10:
+                level = 10
+            else:
+                level = len(solution_partitions)
             solution_path = self.sep.join([self.partition_path, channel, str(solution_partition), f"{level}.parquet"])
             solution_paths.append(solution_path)
 
@@ -127,3 +130,8 @@ class HyperPlotter:
     def serve(self) -> None:
         """Start the plotting instance with a default view."""
         self.app.run_server(debug=True)
+
+
+# local demo working with 604,801 points for 2 channels
+plotter = HyperPlotter("dataset")
+plotter.serve()
