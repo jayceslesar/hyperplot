@@ -11,14 +11,17 @@ import polars as pl
 from dash import dcc, html, no_update
 from dash.dependencies import Input, Output, State
 
+from tsdownsample import LTTBDownsampler
+
 external_stylesheets = [dbc.themes.BOOTSTRAP]
 
 
 class HyperPlotter:
     """Class to Handle Plotting Partitioned Data."""
 
-    def __init__(self, partition_path: str):
+    def __init__(self, partition_path: str, max_points: int = 1_000_000):
         self.partition_path = partition_path
+        self.max_points = max_points
         if self.partition_path.startswith("s3"):
             self.fs = fsspec.filesystem("s3")
             self.sep = "/"
@@ -88,7 +91,17 @@ class HyperPlotter:
                     df = df.filter(pl.col("timestamp") >= datetime.fromtimestamp(start))
                 if end:
                     df = df.filter(pl.col("timestamp") <= datetime.fromtimestamp(end))
-
+                # never plot more than 1m points for now
+                if len(df) > self.max_points:
+                    x = df["timestamp"].to_numpy()
+                    y = df["value"].to_numpy()
+                    indices = LTTBDownsampler().downsample(x, y, n_out=self.max_points)
+                    df = pl.DataFrame(
+                        {
+                            "timestamp": x[indices],
+                            "value": y[indices],
+                        }
+                    )
                 if len(df) <= 8_000:
                     fig.add_trace(
                         go.Scatter(x=df["timestamp"], y=df["value"], name=channel, mode="markers", marker={"size": 4})
@@ -144,5 +157,5 @@ class HyperPlotter:
 
 
 # local demo working with 604,801 points for 2 channels
-plotter = HyperPlotter("dataset")
+plotter = HyperPlotter("fast_dataset")
 plotter.serve()
