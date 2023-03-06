@@ -87,7 +87,11 @@ class HyperPlotter:
                     df = df.filter(pl.col("timestamp") >= datetime.fromtimestamp(start))
                 if end:
                     df = df.filter(pl.col("timestamp") <= datetime.fromtimestamp(end))
-                fig.add_trace(go.Scatter(x=df["timestamp"], y=df["value"], name=channel, mode="markers"))
+
+                if len(df) <= 8_000:
+                    fig.add_trace(go.Scatter(x=df["timestamp"], y=df["value"], name=channel, mode="markers", marker={"size": 4}))
+                else:
+                    fig.add_trace(go.Scattergl(x=df["timestamp"], y=df["value"], name=channel, mode="lines"))
 
             return fig
 
@@ -100,7 +104,7 @@ class HyperPlotter:
     def _solve_partitions(self, channel: str, relay_data: dict) -> tuple[list[str], datetime | None, datetime | None]:
         solution_paths = []
         partitions = self.get_channel_partitions(channel)
-        if relay_data.get("autosize", None) or relay_data.get("xaxis.autorange", None):
+        if relay_data.get("autosize", None) or relay_data.get("xaxis.autorange", None) or "xaxis.range[0]" not in relay_data:
             start = None
             end = None
             solution_partitions = partitions
@@ -108,13 +112,13 @@ class HyperPlotter:
             # :23 here because datetime cant handle it
             start = datetime.fromisoformat(relay_data["xaxis.range[0]"][:23]).timestamp()
             end = datetime.fromisoformat(relay_data["xaxis.range[1]"][:23]).timestamp()
-            solution_partitions = [int(p) for p in partitions if start <= int(p) >= end]
+            solution_partitions = [int(p) for p in partitions if start <= int(p) <= end]
             # case entirely inside a single partition...
             if not solution_partitions:
-                solution_partitions = [[int(p) for p in partitions if int(p) >= start][-1]]
-            else:  # get one before...
-                one_before_idx = partitions.index(str(min(solution_partitions))) - 1
-                solution_partitions = [partitions[one_before_idx]] + solution_partitions
+                solution_partitions = [[int(p) for p in partitions if int(p) >= start][0]]
+
+            one_before_idx = partitions.index(str(min(solution_partitions))) - 1
+            solution_partitions = [partitions[one_before_idx]] + solution_partitions
 
         for solution_partition in solution_partitions:
             # this needs to be optimized by hertz somehow but we dont really care as we put 100k points in a partition as of now
