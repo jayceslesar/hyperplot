@@ -10,7 +10,6 @@ import plotly.graph_objects as go
 import polars as pl
 from dash import dcc, html, no_update
 from dash.dependencies import Input, Output, State
-
 from tsdownsample import LTTBDownsampler
 
 external_stylesheets = [dbc.themes.BOOTSTRAP]
