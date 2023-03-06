@@ -17,7 +17,8 @@ dependencies = [
   "polars",
   "plotly",
   "fsspec",
-  "dash"
+  "dash",
+  "dash_bootstrap_components"
 ]
 
 [project.optional-dependencies]
