@@ -89,7 +89,9 @@ class HyperPlotter:
                     df = df.filter(pl.col("timestamp") <= datetime.fromtimestamp(end))
 
                 if len(df) <= 8_000:
-                    fig.add_trace(go.Scatter(x=df["timestamp"], y=df["value"], name=channel, mode="markers", marker={"size": 4}))
+                    fig.add_trace(
+                        go.Scatter(x=df["timestamp"], y=df["value"], name=channel, mode="markers", marker={"size": 4})
+                    )
                 else:
                     fig.add_trace(go.Scattergl(x=df["timestamp"], y=df["value"], name=channel, mode="lines"))
 
@@ -104,7 +106,11 @@ class HyperPlotter:
     def _solve_partitions(self, channel: str, relay_data: dict) -> tuple[list[str], datetime | None, datetime | None]:
         solution_paths = []
         partitions = self.get_channel_partitions(channel)
-        if relay_data.get("autosize", None) or relay_data.get("xaxis.autorange", None) or "xaxis.range[0]" not in relay_data:
+        if (
+            relay_data.get("autosize", None)
+            or relay_data.get("xaxis.autorange", None)
+            or "xaxis.range[0]" not in relay_data
+        ):
             start = None
             end = None
             solution_partitions = partitions
