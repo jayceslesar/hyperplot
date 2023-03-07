@@ -18,6 +18,6 @@ Robust to out of order data but not duplicates so best to ingest data on an even
 
 ### Open Questions:
 
-- Optimal Partition Size?
+- Optimal max points in highest resolution?
 
-- Linear or Log levels?
+- Linear or log steps in levels?
