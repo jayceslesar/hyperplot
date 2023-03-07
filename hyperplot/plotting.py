@@ -12,13 +12,15 @@ from dash import dcc, html, no_update
 from dash.dependencies import Input, Output, State
 from tsdownsample import LTTBDownsampler
 
+from hyperplot.partitioning import to_datetime
+
 external_stylesheets = [dbc.themes.BOOTSTRAP]
 
 
 class HyperPlotter:
     """Class to Handle Plotting Partitioned Data."""
 
-    def __init__(self, partition_path: str, max_points: int = 25_000):
+    def __init__(self, partition_path: str, max_points: int = 5_000):
         self.partition_path = partition_path
         self.max_points = max_points
         if self.partition_path.startswith("s3"):
@@ -126,8 +128,10 @@ class HyperPlotter:
             solution_partitions = partitions
         else:
             # :23 here because datetime cant handle it
-            start = datetime.fromisoformat(relay_data["xaxis.range[0]"][:23]).timestamp()
-            end = datetime.fromisoformat(relay_data["xaxis.range[1]"][:23]).timestamp()
+            start = to_datetime(relay_data["xaxis.range[0]"]).timestamp()
+            end = to_datetime(relay_data["xaxis.range[1]"]).timestamp()
+            # start = datetime.fromisoformat(relay_data["xaxis.range[0]"][:23]).timestamp()
+            # end = datetime.fromisoformat(relay_data["xaxis.range[1]"][:23]).timestamp()
             solution_partitions = [int(p) for p in partitions if start <= int(p) <= end]
             # case entirely inside a single partition...
             if not solution_partitions:

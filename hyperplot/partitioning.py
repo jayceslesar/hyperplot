@@ -9,21 +9,19 @@ from tsdownsample import LTTBDownsampler
 
 def to_datetime(to_convert: int | float | str | datetime) -> datetime:
     if isinstance(to_convert, datetime):
-        converted = to_convert
+        return to_convert
 
     elif isinstance(to_convert, (int, float)):
-        converted = datetime.fromtimestamp(to_convert)
+        return datetime.fromtimestamp(to_convert)
 
     elif isinstance(to_convert, str):
         try:
-            converted = datetime.fromisoformat(to_convert)
+            return datetime.fromisoformat(to_convert)
         except ValueError:
-            converted = datetime.strptime(to_convert, "%Y-%m-%d %H:%M:%S.%f")
+            return datetime.strptime(to_convert, "%Y-%m-%d %H:%M:%S.%f")
 
     else:
         raise ValueError(f"Unrecognized format {to_convert}!")
-
-    return converted
 
 
 def partition_df(
@@ -57,7 +55,7 @@ def partition_df(
     # convert everything to UNIX time including nanoseconds
     # TODO: make sure this actually works for messy timestamps
     # Ideally this is written as nanoseconds so we can support high frequency stuff
-    df = df.with_columns([pl.col("timestamp").apply(lambda x:to_datetime(x))])
+    df = df.with_columns([pl.col("timestamp").apply(lambda x: to_datetime(x))])
     first = df["timestamp"].min().timestamp()
     last = df["timestamp"].max().timestamp()
     if hertz is None:
