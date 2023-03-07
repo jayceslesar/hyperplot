@@ -8,6 +8,17 @@ from tsdownsample import LTTBDownsampler
 
 
 def to_datetime(to_convert: int | float | str | datetime) -> datetime:
+    """Convert to datetime from a given input.
+
+    Args:
+        to_convert: what should be a datetime
+
+    Raises:
+        ValueError: if the input cant be parsed correctly
+
+    Returns:
+        the converted input
+    """
     if isinstance(to_convert, datetime):
         return to_convert
 
