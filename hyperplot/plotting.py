@@ -20,7 +20,7 @@ external_stylesheets = [dbc.themes.BOOTSTRAP]
 class HyperPlotter:
     """Class to Handle Plotting Partitioned Data."""
 
-    def __init__(self, partition_path: str, max_points: int = 5_000):
+    def __init__(self, partition_path: str, max_points: int = 10_000):
         self.partition_path = partition_path
         self.max_points = max_points
         if self.partition_path.startswith("s3"):
@@ -58,6 +58,7 @@ class HyperPlotter:
                     [
                         dbc.Card(
                             children=[
+                                dcc.Store(id="partitions", storage_type="session"),
                                 dbc.CardHeader(html.H2("Main Graph")),
                                 dbc.CardBody(
                                     children=[
@@ -130,8 +131,7 @@ class HyperPlotter:
             # :23 here because datetime cant handle it
             start = to_datetime(relay_data["xaxis.range[0]"]).timestamp()
             end = to_datetime(relay_data["xaxis.range[1]"]).timestamp()
-            # start = datetime.fromisoformat(relay_data["xaxis.range[0]"][:23]).timestamp()
-            # end = datetime.fromisoformat(relay_data["xaxis.range[1]"][:23]).timestamp()
+
             solution_partitions = [int(p) for p in partitions if start <= int(p) <= end]
             # case entirely inside a single partition...
             if not solution_partitions:
