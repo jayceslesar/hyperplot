@@ -7,6 +7,25 @@ import polars as pl
 from tsdownsample import LTTBDownsampler
 
 
+def to_datetime(to_convert: int | float | str | datetime) -> datetime:
+    if isinstance(to_convert, datetime):
+        converted = to_convert
+
+    elif isinstance(to_convert, (int, float)):
+        converted = datetime.fromtimestamp(to_convert)
+
+    elif isinstance(to_convert, str):
+        try:
+            converted = datetime.fromisoformat(to_convert)
+        except ValueError:
+            converted = datetime.strptime(to_convert, "%Y-%m-%d %H:%M:%S.%f")
+
+    else:
+        raise ValueError(f"Unrecognized format {to_convert}!")
+
+    return converted
+
+
 def partition_df(
     df_or_path: str | pl.DataFrame,
     partition_path: str,
@@ -27,7 +46,7 @@ def partition_df(
     if isinstance(df_or_path, pl.DataFrame):
         df = df_or_path
     else:
-        df = pl.read_csv(df_path) if df_path.endswith("csv") else pl.read_parquet(df_path)
+        df = pl.read_csv(df_or_path) if df_or_path.endswith("csv") else pl.read_parquet(df_or_path)
 
     if df.columns != ["timestamp", "value"]:
         raise ValueError(f"Expected columns to be timestamp and value! Got {df.columns}.")
@@ -38,8 +57,7 @@ def partition_df(
     # convert everything to UNIX time including nanoseconds
     # TODO: make sure this actually works for messy timestamps
     # Ideally this is written as nanoseconds so we can support high frequency stuff
-    df = df.with_columns([pl.col("timestamp").cast(pl.Datetime(time_unit="ns"))])
-
+    df = df.with_columns([pl.col("timestamp").apply(lambda x:to_datetime(x))])
     first = df["timestamp"].min().timestamp()
     last = df["timestamp"].max().timestamp()
     if hertz is None:

@@ -90,7 +90,7 @@ class HyperPlotter:
                     df = df.filter(pl.col("timestamp") >= datetime.fromtimestamp(start))
                 if end:
                     df = df.filter(pl.col("timestamp") <= datetime.fromtimestamp(end))
-                # never plot more than 1m points for now
+
                 if len(df) > self.max_points:
                     x = df["timestamp"].to_numpy()
                     y = df["value"].to_numpy()
@@ -153,5 +153,5 @@ class HyperPlotter:
 
 
 # local demo working with 604,801 points for 2 channels
-plotter = HyperPlotter("fast_dataset")
+plotter = HyperPlotter("datamart")
 plotter.serve()
