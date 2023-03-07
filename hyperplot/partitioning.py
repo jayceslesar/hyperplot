@@ -42,6 +42,7 @@ def partition_df(
     hertz: int | float | None = None,
     levels: int = 10,
     max_points_per_partition: int = 100_000,
+    linear_levels: bool = True,
 ) -> None:
     """Expects a dataframe with 2 columns, timestamp and value.
 
@@ -51,6 +52,7 @@ def partition_df(
         signal_name: name of the signal (for pathing)
         hertz: frequency of the signal, if not provided will calculate.
         levels: Number of resolutions to store. Defaults to 20.
+        linear_levels: use linear scale or log scale if False
     """
     if isinstance(df_or_path, pl.DataFrame):
         df = df_or_path
@@ -95,8 +97,14 @@ def partition_df(
         split_path = sep.join([base_partition, split_start])
         if makedirs:
             os.makedirs(split_path, exist_ok=True)
-        for level in range(1, levels + 1):
-            level_points = int(len(split_df) / level)
+        for level in range(1, levels):
+            if linear_levels:
+                level_points = int(len(split_df) / level)
+            else:
+                if level == 1:
+                    level_points = len(split_df)
+                else:
+                    level_points = int(len(split_df) / 10**level)
             x = split_df["timestamp"].to_numpy()
             y = split_df["value"].to_numpy()
             level_indices = LTTBDownsampler().downsample(x, y, n_out=level_points)

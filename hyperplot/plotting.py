@@ -6,10 +6,12 @@ from datetime import datetime, timezone
 import dash
 import dash_bootstrap_components as dbc
 import fsspec
+import numpy as np
 import plotly.graph_objects as go
 import polars as pl
 from dash import dcc, html, no_update
 from dash.dependencies import Input, Output, State
+from plotly.subplots import make_subplots
 from tsdownsample import LTTBDownsampler
 
 from hyperplot.partitioning import to_datetime
@@ -20,8 +22,9 @@ external_stylesheets = [dbc.themes.BOOTSTRAP]
 class HyperPlotter:
     """Class to Handle Plotting Partitioned Data."""
 
-    def __init__(self, partition_path: str, max_points: int = 10_000):
+    def __init__(self, partition_path: str, max_level: int, max_points: int = 10_000):
         self.partition_path = partition_path
+        self.max_level = max_level
         self.max_points = max_points
         if self.partition_path.startswith("s3"):
             self.fs = fsspec.filesystem("s3")
@@ -81,9 +84,9 @@ class HyperPlotter:
             prevent_initial_call=True,
         )
         def update_output(channels, relay_data):
-            fig = go.Figure()
+            traces = {}
             if channels is None:
-                return fig
+                return go.Figure()
             for channel in channels:
                 paths, start, end = self._solve_partitions(channel, relay_data)
                 # this can be threaded for sure
@@ -93,6 +96,8 @@ class HyperPlotter:
                 if end:
                     df = df.filter(pl.col("timestamp") <= datetime.fromtimestamp(end))
 
+                x = df["timestamp"]
+                y = df["value"]
                 if len(df) > self.max_points:
                     x = df["timestamp"].to_numpy()
                     y = df["value"].to_numpy()
@@ -103,10 +108,65 @@ class HyperPlotter:
                             "value": y[indices],
                         }
                     )
-                fig.add_trace(
-                    go.Scatter(x=df["timestamp"], y=df["value"], name=channel, mode="markers", marker={"size": 4})
+                    x = list(df["timestamp"])
+                    y = list(df["value"])
+
+                    # calculate draw lines or not
+                    mean_delta = np.mean(np.diff(x))
+                    gaps_x = [x[0]]
+                    gaps_y = [y[0]]
+                    line_diff_cutoff = 5 * mean_delta
+
+                    for i in range(len(df)):
+                        if abs(x[i] - gaps_x[-1]) > line_diff_cutoff:
+                            # interpolate timestamp with middle value and add None so we see a line break
+                            gaps_x.append(x[i] + (gaps_x[-1] - x[i]) / 2)
+                            gaps_y.append(None)
+                        gaps_x.append(x[i])
+                        gaps_y.append(y[i])
+                    x = gaps_x
+                    y = gaps_y
+
+                # always draw markers if 2 or less partitions
+                if len(paths) <= 2:
+                    mode = "markers"
+                    marker = {"size": 5}
+                    line = None
+                else:
+                    mode = "lines"
+                    marker = None
+                    line = {"width": 3}
+
+                # magnitude calc so we can create subplots for traces with very different scales
+                real_values = [val for val in y if val is not None]
+                min_y = min(real_values)
+                max_y = max(real_values)
+                magnitude = len(str(int(max_y - min_y)))
+                if magnitude not in traces:
+                    traces[magnitude] = []
+                traces[magnitude].append(
+                    go.Scatter(
+                        x=x,
+                        y=y,
+                        name=channel,
+                        mode=mode,
+                        marker=marker,
+                        line=line,
+                        showlegend=True,
+                        legendgroup=magnitude,
+                    )
                 )
 
+            if not traces:
+                return go.Figure()
+
+            fig = make_subplots(rows=len(traces), cols=1, shared_xaxes=True)
+            for i, magnitude in enumerate(traces):
+                magnitude_traces = traces[magnitude]
+                for trace in magnitude_traces:
+                    fig.add_trace(trace, row=i + 1, col=1)
+
+            fig.update_layout(legend_tracegroupgap=80)
             return fig
 
         self.app = app
@@ -141,8 +201,8 @@ class HyperPlotter:
 
         for solution_partition in solution_partitions:
             # this needs to be optimized by hertz somehow but we dont really care as we put 100k points in a partition as of now
-            if len(solution_partitions) >= 10:
-                level = 10
+            if len(solution_partitions) >= self.max_level:
+                level = self.max_level
             else:
                 level = len(solution_partitions)
             solution_path = self.sep.join([self.partition_path, channel, str(solution_partition), f"{level}.parquet"])
@@ -156,5 +216,5 @@ class HyperPlotter:
 
 
 # local demo working with 604,801 points for 2 channels
-plotter = HyperPlotter("datamart")
+plotter = HyperPlotter("datamart_linear", max_level=10)
 plotter.serve()
