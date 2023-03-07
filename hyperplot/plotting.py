@@ -58,7 +58,6 @@ class HyperPlotter:
                     [
                         dbc.Card(
                             children=[
-                                dcc.Store(id="partitions", storage_type="session"),
                                 dbc.CardHeader(html.H2("Main Graph")),
                                 dbc.CardBody(
                                     children=[
