@@ -18,7 +18,7 @@ external_stylesheets = [dbc.themes.BOOTSTRAP]
 class HyperPlotter:
     """Class to Handle Plotting Partitioned Data."""
 
-    def __init__(self, partition_path: str, max_points: int = 1_000_000):
+    def __init__(self, partition_path: str, max_points: int = 25_000):
         self.partition_path = partition_path
         self.max_points = max_points
         if self.partition_path.startswith("s3"):
@@ -101,12 +101,9 @@ class HyperPlotter:
                             "value": y[indices],
                         }
                     )
-                if len(df) <= 8_000:
-                    fig.add_trace(
-                        go.Scatter(x=df["timestamp"], y=df["value"], name=channel, mode="markers", marker={"size": 4})
-                    )
-                else:
-                    fig.add_trace(go.Scattergl(x=df["timestamp"], y=df["value"], name=channel, mode="lines"))
+                fig.add_trace(
+                    go.Scatter(x=df["timestamp"], y=df["value"], name=channel, mode="markers", marker={"size": 4})
+                )
 
             return fig
 
