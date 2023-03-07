@@ -15,6 +15,10 @@ Robust to out of order data but not duplicates so best to ingest data on an even
 
 - Better level solver
 
+- Only redraw graph if partitions have changed
+
+- Smart line drawing (when do we show lines vs points)
+
 
 ### Open Questions:
 
