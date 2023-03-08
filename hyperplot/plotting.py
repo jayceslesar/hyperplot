@@ -22,7 +22,7 @@ external_stylesheets = [dbc.themes.BOOTSTRAP]
 class HyperPlotter:
     """Class to Handle Plotting Partitioned Data."""
 
-    def __init__(self, partition_path: str, max_level: int, max_points: int = 10_000):
+    def __init__(self, partition_path: str, max_level: int, max_points: int = 5_000):
         self.partition_path = partition_path
         self.max_level = max_level
         self.max_points = max_points
@@ -192,7 +192,6 @@ class HyperPlotter:
             end = None
             solution_partitions = partitions
         else:
-            # :23 here because datetime cant handle it
             start = to_datetime(relay_data["xaxis.range[0]"]).timestamp()
             end = to_datetime(relay_data["xaxis.range[1]"]).timestamp()
 
