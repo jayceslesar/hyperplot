@@ -42,39 +42,44 @@ class HyperPlotter:
             [
                 dbc.Row(
                     [
-                        dbc.Card(
-                            children=[
-                                dbc.CardHeader(html.H2("Channels")),
-                                dcc.Checklist(
-                                    self.channels,
-                                    [],
-                                    id="signals-checklist",
-                                    labelStyle={"display": "block"},
-                                    style={"height": 200, "width": 200, "overflow": "auto"},
-                                ),
-                            ],
-                        )
-                    ],
-                    className="align-self-center",
-                ),
-                dbc.Row(
-                    [
-                        dbc.Card(
-                            children=[
-                                dbc.CardHeader(html.H2("Main Graph")),
-                                dbc.CardBody(
+                        dbc.Col(
+                            [
+                                dbc.Card(
                                     children=[
-                                        dcc.Loading(
-                                            children=[
-                                                dcc.Graph(id="main-graph"),
-                                            ]
-                                        )
+                                        dbc.CardHeader(html.H2("Channels")),
+                                        dcc.Checklist(
+                                            self.channels,
+                                            [],
+                                            id="signals-checklist",
+                                            labelStyle={"display": "block"},
+                                            style={"height": "100vh", "overflow": "auto"},
+                                        ),
                                     ],
-                                ),
+                                )
                             ],
+                            className="align-self-center",
+                            width=3,
                         ),
-                    ]
-                ),
+                        dbc.Col(
+                            [
+                                dbc.Card(
+                                    children=[
+                                        dbc.CardHeader(html.H2("Plotting")),
+                                        dbc.CardBody(
+                                            children=[
+                                                dcc.Loading(
+                                                    children=[
+                                                        dcc.Graph(id="main-graph", style={"height": "80vh"}),
+                                                    ]
+                                                )
+                                            ],
+                                        ),
+                                    ]
+                                ),
+                            ]
+                        ),
+                    ],
+                )
             ]
         )
 
@@ -139,9 +144,9 @@ class HyperPlotter:
 
                 # magnitude calc so we can create subplots for traces with very different scales
                 real_values = [val for val in y if val is not None]
-                min_y = min(real_values)
-                max_y = max(real_values)
-                magnitude = len(str(int(max_y - min_y)))
+                min_y = abs(min(real_values))
+                max_y = abs(max(real_values))
+                magnitude = len(str(int(max(min_y, max_y))))
                 if magnitude not in traces:
                     traces[magnitude] = []
                 traces[magnitude].append(
@@ -213,8 +218,3 @@ class HyperPlotter:
     def serve(self) -> None:
         """Start the plotting instance with a default view."""
         self.app.run_server(debug=True)
-
-
-# local demo working with 604,801 points for 2 channels
-plotter = HyperPlotter("datamart_linear", max_level=10)
-plotter.serve()
