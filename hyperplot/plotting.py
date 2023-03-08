@@ -36,7 +36,7 @@ class HyperPlotter:
             self.fs = fsspec.filesystem("file")
             self.sep = os.path.sep
 
-        self.channels = [os.path.basename(signal) for signal in self.fs.ls(self.partition_path)]
+        self.channels = sorted([os.path.basename(signal) for signal in self.fs.ls(self.partition_path)])
         app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
         app.layout = html.Div(
             [
