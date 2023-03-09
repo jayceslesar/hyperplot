@@ -146,7 +146,7 @@ class HyperPlotter:
                 real_values = [val for val in y if val is not None]
                 min_y = abs(min(real_values))
                 max_y = abs(max(real_values))
-                magnitude = len(str(int(max(min_y, max_y))))
+                magnitude = len(str(int(sum((min_y, max_y)))))
                 if magnitude not in traces:
                     traces[magnitude] = []
                 traces[magnitude].append(
