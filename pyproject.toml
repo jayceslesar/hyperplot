@@ -20,7 +20,8 @@ dependencies = [
   "plotly",
   "fsspec",
   "dash",
-  "dash_bootstrap_components"
+  "dash_bootstrap_components",
+  "pyarrow",  # needed to convert pandas to polars
 ]
 
 [project.optional-dependencies]

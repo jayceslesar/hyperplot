@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 
 import polars as pl
+import pandas as pd
 from tsdownsample import LTTBDownsampler
 
 
@@ -36,7 +37,7 @@ def to_datetime(to_convert: int | float | str | datetime) -> datetime:
 
 
 def partition_df(
-    df_or_path: str | pl.DataFrame,
+    df_or_path: str | pl.DataFrame | pd.DataFrame,
     partition_path: str,
     signal_name: str,
     hertz: int | float | None = None,
@@ -56,6 +57,8 @@ def partition_df(
     """
     if isinstance(df_or_path, pl.DataFrame):
         df = df_or_path
+    elif isinstance(df_or_path, pd.DataFrame):
+        df = pl.from_pandas(df_or_path)
     else:
         df = pl.read_csv(df_or_path) if df_or_path.endswith("csv") else pl.read_parquet(df_or_path)
 
