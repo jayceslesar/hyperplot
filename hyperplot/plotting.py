@@ -26,6 +26,9 @@ class HyperPlotter:
         self.dataset_paths = dataset_paths
         self.max_level = max_level
         self.max_points = max_points
+        # store previous zooms
+        self.previous_starts = set()
+        self.previous_ends = set()
 
         # figure out what filesystem to use
         dataset_loc = self.dataset_paths[list(self.dataset_paths.keys())[0]]
@@ -76,7 +79,7 @@ class HyperPlotter:
                                         dbc.CardHeader(html.H2("Channels")),
                                         *dropdowns,
                                     ],
-                                style={"height": "100vh"},
+                                    style={"height": "100vh"},
                                 )
                             ],
                             className="align-self-center",
@@ -227,6 +230,8 @@ class HyperPlotter:
         else:
             start = to_datetime(relay_data["xaxis.range[0]"]).timestamp()
             end = to_datetime(relay_data["xaxis.range[1]"]).timestamp()
+            self.previous_starts.add(relay_data["xaxis.range[0]"])
+            self.previous_ends.add(relay_data["xaxis.range[1]"])
 
             solution_partitions = [int(p) for p in partitions if start <= int(p) <= end]
             # case entirely inside a single partition...
