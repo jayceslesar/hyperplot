@@ -17,9 +17,9 @@ Robust to out of order data but not duplicates so best to ingest data on an even
 
 - Only redraw graph if partitions have changed
 
-- Can unclick only one trace in a subplot where there may be multiple traces on one subplot (have to use the checkboxes)
-
 - Issue where a trace could change subplots when magnitudes are recalculated (maybe okay?)
+
+- Go back button to go back to a previous view
 
 
 ### Open Questions:
