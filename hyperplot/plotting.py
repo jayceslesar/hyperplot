@@ -164,9 +164,9 @@ class HyperPlotter:
 
                     # always draw markers less than self.points_cutoff
                     if len(y) <= self.points_cutoff:
-                        mode = "markers"
+                        mode = "lines+markers"
                         marker = {"size": 5}
-                        line = None
+                        line = {"width": 2}
                     else:
                         mode = "lines"
                         marker = None
@@ -177,6 +177,8 @@ class HyperPlotter:
                     real_values = [val for val in real_values if val != float("nan")]
                     real_values = [val for val in real_values if val != np.nan]
                     real_values = [val for val in real_values if str(val) != "nan"]
+                    if not real_values:
+                        continue
                     min_y = abs(min(real_values))
                     max_y = abs(max(real_values))
                     magnitude = len(str(int(sum((min_y, max_y)))))
