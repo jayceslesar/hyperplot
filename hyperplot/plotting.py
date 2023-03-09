@@ -22,10 +22,11 @@ external_stylesheets = [dbc.themes.BOOTSTRAP]
 class HyperPlotter:
     """Class to Handle Plotting Partitioned Data."""
 
-    def __init__(self, dataset_paths: dict[str, str], max_level: int, max_points: int = 5_000):
+    def __init__(self, dataset_paths: dict[str, str], max_level: int, max_points: int = 5_000, points_cutoff: int = 100):
         self.dataset_paths = dataset_paths
         self.max_level = max_level
         self.max_points = max_points
+        self.points_cutoff = points_cutoff
         # store previous zooms
         self.previous_starts = set()
         self.previous_ends = set()
@@ -124,7 +125,7 @@ class HyperPlotter:
                 for channel in channels:
                     paths, start, end = self._solve_partitions(channel, relay_data)
                     # this can be threaded for sure
-                    df = pl.concat([pl.read_parquet(path) for path in paths])
+                    df = pl.concat([pl.read_parquet(path) for path in paths]).sort("timestamp")
                     if start:
                         df = df.filter(pl.col("timestamp") >= datetime.fromtimestamp(start))
                     if end:
@@ -141,7 +142,7 @@ class HyperPlotter:
                                 "timestamp": x[indices],
                                 "value": y[indices],
                             }
-                        )
+                        ).sort("timestamp")
                         x = list(df["timestamp"])
                         y = list(df["value"])
 
@@ -161,15 +162,15 @@ class HyperPlotter:
                         x = gaps_x
                         y = gaps_y
 
-                    # always draw markers if 2 or less partitions
-                    if len(paths) <= 2:
+                    # always draw markers less than self.points_cutoff
+                    if len(y) <= self.points_cutoff:
                         mode = "markers"
                         marker = {"size": 5}
                         line = None
                     else:
                         mode = "lines"
                         marker = None
-                        line = {"width": 3}
+                        line = {"width": 2}
 
                     # magnitude calc so we can create subplots for traces with very different scales
                     real_values = [val for val in y if val is not None]
@@ -179,6 +180,8 @@ class HyperPlotter:
                     min_y = abs(min(real_values))
                     max_y = abs(max(real_values))
                     magnitude = len(str(int(sum((min_y, max_y)))))
+                    # bin these together because they are small enough
+                    magnitude = 1 if magnitude == 2 else magnitude
                     if magnitude not in traces:
                         traces[magnitude] = []
                     traces[magnitude].append(
@@ -236,7 +239,10 @@ class HyperPlotter:
             solution_partitions = [int(p) for p in partitions if start <= int(p) <= end]
             # case entirely inside a single partition...
             if not solution_partitions:
-                solution_partitions = [[int(p) for p in partitions if int(p) >= start][0]]
+                if len(partitions) == 1:
+                    solution_partitions = partitions
+                else:
+                    solution_partitions = [[int(p) for p in partitions if int(p) >= start][0]]
 
             one_before_idx = partitions.index(str(min(solution_partitions))) - 1
             solution_partitions = [partitions[one_before_idx]] + solution_partitions
