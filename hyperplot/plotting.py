@@ -22,21 +22,48 @@ external_stylesheets = [dbc.themes.BOOTSTRAP]
 class HyperPlotter:
     """Class to Handle Plotting Partitioned Data."""
 
-    def __init__(self, partition_path: str, max_level: int, max_points: int = 5_000):
-        self.partition_path = partition_path
+    def __init__(self, dataset_paths: dict[str, str], max_level: int, max_points: int = 5_000):
+        self.dataset_paths = dataset_paths
         self.max_level = max_level
         self.max_points = max_points
-        if self.partition_path.startswith("s3"):
+
+        # figure out what filesystem to use
+        dataset_loc = self.dataset_paths[list(self.dataset_paths.keys())[0]]
+        if dataset_loc.startswith("s3"):
             self.fs = fsspec.filesystem("s3")
             self.sep = "/"
-        elif self.partition_path.startswith("gs"):
+        elif dataset_loc.startswith("gs"):
             self.fs = fsspec.filesystem("gs")
             self.sep = "/"
         else:
             self.fs = fsspec.filesystem("file")
             self.sep = os.path.sep
 
-        self.channels = sorted([os.path.basename(signal) for signal in self.fs.ls(self.partition_path)])
+        self.channels = {}
+        for dataset in self.dataset_paths:
+            self.channels[dataset] = sorted(
+                [os.path.basename(signal) for signal in self.fs.ls(self.dataset_paths[dataset])]
+            )
+
+        dropdowns = []
+        self.inputs = []
+        vh = 100 / len(self.dataset_paths)
+        for dataset in self.dataset_paths:
+            input_name = f"{dataset}-signals-checklist"
+            self.inputs.append(Input(input_name, "value"))
+            dropdown = dbc.DropdownMenu(
+                children=[
+                    dcc.Checklist(
+                        self.channels[dataset],
+                        [],
+                        id=input_name,
+                        labelStyle={"display": "block"},
+                        style={"height": f"{vh}vh", "overflow": "auto"},
+                    )
+                ],
+                label=dataset,
+            )
+            dropdowns.append(dropdown)
         app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
         app.layout = html.Div(
             [
@@ -47,14 +74,9 @@ class HyperPlotter:
                                 dbc.Card(
                                     children=[
                                         dbc.CardHeader(html.H2("Channels")),
-                                        dcc.Checklist(
-                                            self.channels,
-                                            [],
-                                            id="signals-checklist",
-                                            labelStyle={"display": "block"},
-                                            style={"height": "100vh", "overflow": "auto"},
-                                        ),
+                                        *dropdowns,
                                     ],
+                                style={"height": "100vh"},
                                 )
                             ],
                             className="align-self-center",
@@ -69,14 +91,15 @@ class HyperPlotter:
                                             children=[
                                                 dcc.Loading(
                                                     children=[
-                                                        dcc.Graph(id="main-graph", style={"height": "80vh"}),
+                                                        dcc.Graph(id="main-graph", style={"height": "90vh"}),
                                                     ]
                                                 )
                                             ],
                                         ),
                                     ]
                                 ),
-                            ]
+                            ],
+                            width=9,
                         ),
                     ],
                 )
@@ -85,82 +108,88 @@ class HyperPlotter:
 
         @app.callback(
             Output("main-graph", "figure"),
-            [Input("signals-checklist", "value"), Input("main-graph", "relayoutData")],
+            [*self.inputs, Input("main-graph", "relayoutData")],
             prevent_initial_call=True,
         )
-        def update_output(channels, relay_data):
+        def update_output(*args):
             traces = {}
-            if channels is None:
+            dataset_selections = args[:-1]
+            relay_data = args[-1]
+            if not any(dataset_selections):
                 return go.Figure()
-            for channel in channels:
-                paths, start, end = self._solve_partitions(channel, relay_data)
-                # this can be threaded for sure
-                df = pl.concat([pl.read_parquet(path) for path in paths])
-                if start:
-                    df = df.filter(pl.col("timestamp") >= datetime.fromtimestamp(start))
-                if end:
-                    df = df.filter(pl.col("timestamp") <= datetime.fromtimestamp(end))
+            for channels in dataset_selections:
+                for channel in channels:
+                    paths, start, end = self._solve_partitions(channel, relay_data)
+                    # this can be threaded for sure
+                    df = pl.concat([pl.read_parquet(path) for path in paths])
+                    if start:
+                        df = df.filter(pl.col("timestamp") >= datetime.fromtimestamp(start))
+                    if end:
+                        df = df.filter(pl.col("timestamp") <= datetime.fromtimestamp(end))
 
-                x = df["timestamp"]
-                y = df["value"]
-                if len(df) > self.max_points:
-                    x = df["timestamp"].to_numpy()
-                    y = df["value"].to_numpy()
-                    indices = LTTBDownsampler().downsample(x, y, n_out=self.max_points)
-                    df = pl.DataFrame(
-                        {
-                            "timestamp": x[indices],
-                            "value": y[indices],
-                        }
+                    x = df["timestamp"]
+                    y = df["value"]
+                    if len(df) > self.max_points:
+                        x = df["timestamp"].to_numpy()
+                        y = df["value"].to_numpy()
+                        indices = LTTBDownsampler().downsample(x, y, n_out=self.max_points)
+                        df = pl.DataFrame(
+                            {
+                                "timestamp": x[indices],
+                                "value": y[indices],
+                            }
+                        )
+                        x = list(df["timestamp"])
+                        y = list(df["value"])
+
+                        # calculate draw lines or not
+                        mean_delta = np.mean(np.diff(x))
+                        gaps_x = [x[0]]
+                        gaps_y = [y[0]]
+                        line_diff_cutoff = 5 * mean_delta
+
+                        for i in range(len(df)):
+                            if abs(x[i] - gaps_x[-1]) > line_diff_cutoff:
+                                # interpolate timestamp with middle value and add None so we see a line break
+                                gaps_x.append(x[i] + (gaps_x[-1] - x[i]) / 2)
+                                gaps_y.append(None)
+                            gaps_x.append(x[i])
+                            gaps_y.append(y[i])
+                        x = gaps_x
+                        y = gaps_y
+
+                    # always draw markers if 2 or less partitions
+                    if len(paths) <= 2:
+                        mode = "markers"
+                        marker = {"size": 5}
+                        line = None
+                    else:
+                        mode = "lines"
+                        marker = None
+                        line = {"width": 3}
+
+                    # magnitude calc so we can create subplots for traces with very different scales
+                    real_values = [val for val in y if val is not None]
+                    real_values = [val for val in real_values if val != float("nan")]
+                    real_values = [val for val in real_values if val != np.nan]
+                    real_values = [val for val in real_values if str(val) != "nan"]
+                    min_y = abs(min(real_values))
+                    max_y = abs(max(real_values))
+                    magnitude = len(str(int(sum((min_y, max_y)))))
+                    if magnitude not in traces:
+                        traces[magnitude] = []
+                    traces[magnitude].append(
+                        go.Scatter(
+                            x=x,
+                            y=y,
+                            name=channel,
+                            mode=mode,
+                            marker=marker,
+                            line=line,
+                            showlegend=True,
+                            legendgroup=magnitude,
+                        )
                     )
-                    x = list(df["timestamp"])
-                    y = list(df["value"])
-
-                    # calculate draw lines or not
-                    mean_delta = np.mean(np.diff(x))
-                    gaps_x = [x[0]]
-                    gaps_y = [y[0]]
-                    line_diff_cutoff = 5 * mean_delta
-
-                    for i in range(len(df)):
-                        if abs(x[i] - gaps_x[-1]) > line_diff_cutoff:
-                            # interpolate timestamp with middle value and add None so we see a line break
-                            gaps_x.append(x[i] + (gaps_x[-1] - x[i]) / 2)
-                            gaps_y.append(None)
-                        gaps_x.append(x[i])
-                        gaps_y.append(y[i])
-                    x = gaps_x
-                    y = gaps_y
-
-                # always draw markers if 2 or less partitions
-                if len(paths) <= 2:
-                    mode = "markers"
-                    marker = {"size": 5}
-                    line = None
-                else:
-                    mode = "lines"
-                    marker = None
-                    line = {"width": 3}
-
-                # magnitude calc so we can create subplots for traces with very different scales
-                real_values = [val for val in y if val is not None]
-                min_y = abs(min(real_values))
-                max_y = abs(max(real_values))
-                magnitude = len(str(int(sum((min_y, max_y)))))
-                if magnitude not in traces:
-                    traces[magnitude] = []
-                traces[magnitude].append(
-                    go.Scatter(
-                        x=x,
-                        y=y,
-                        name=channel,
-                        mode=mode,
-                        marker=marker,
-                        line=line,
-                        showlegend=True,
-                        legendgroup=magnitude,
-                    )
-                )
 
             if not traces:
                 return go.Figure()
@@ -176,13 +205,17 @@ class HyperPlotter:
 
         self.app = app
 
-    def get_channel_partitions(self, channel: str) -> list[str]:
-        path = self.sep.join([self.partition_path, channel])
-        return sorted([os.path.basename(partition) for partition in self.fs.ls(path)])
+    def get_channel_partitions(self, channel: str) -> tuple[str, list[str]]:
+        for dataset in self.channels:
+            if channel in self.channels[dataset]:
+                partition_path = self.dataset_paths[dataset]
+        dataset = [dataset for dataset in self.dataset_paths]
+        path = self.sep.join([partition_path, channel])
+        return partition_path, sorted([os.path.basename(partition) for partition in self.fs.ls(path)])
 
     def _solve_partitions(self, channel: str, relay_data: dict) -> tuple[list[str], datetime | None, datetime | None]:
         solution_paths = []
-        partitions = self.get_channel_partitions(channel)
+        partition_path, partitions = self.get_channel_partitions(channel)
         if (
             relay_data.get("autosize", None)
             or relay_data.get("xaxis.autorange", None)
@@ -209,11 +242,11 @@ class HyperPlotter:
                 level = self.max_level
             else:
                 level = len(solution_partitions)
-            solution_path = self.sep.join([self.partition_path, channel, str(solution_partition), f"{level}.parquet"])
+            solution_path = self.sep.join([partition_path, channel, str(solution_partition), f"{level}.parquet"])
             solution_paths.append(solution_path)
 
         return solution_paths, start, end
 
     def serve(self) -> None:
         """Start the plotting instance with a default view."""
-        self.app.run_server(debug=True)
+        self.app.run_server(debug=True, host="0.0.0.0")

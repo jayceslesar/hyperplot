@@ -97,7 +97,7 @@ def partition_df(
         split_path = sep.join([base_partition, split_start])
         if makedirs:
             os.makedirs(split_path, exist_ok=True)
-        for level in range(1, levels):
+        for level in range(1, levels + 1):
             if linear_levels:
                 level_points = int(len(split_df) / level)
             else:
