@@ -23,6 +23,15 @@ class HyperPlotter:
     """Class to Handle Plotting Partitioned Data."""
 
     def __init__(self, dataset_paths: dict[str, str], max_level: int, max_points: int = 5_000, points_cutoff: int = 100):
+        """Initialize a plotting instance
+
+        Args:
+            dataset_paths: dict where key is the name of the dataset and value is the path to the partitions
+            max_level: number of levels in each partition
+            max_points: max points to draw for one trace. Defaults to 5_000.
+            points_cutoff: when to draw lines+markers instead of just lines. Defaults to 100.
+
+        """
         self.dataset_paths = dataset_paths
         self.max_level = max_level
         self.max_points = max_points
@@ -214,6 +223,14 @@ class HyperPlotter:
         self.app = app
 
     def get_channel_partitions(self, channel: str) -> tuple[str, list[str]]:
+        """Get all top level partitions for a given channel.
+
+        Args:
+            channel: channel to get partitions for
+
+        Returns:
+            path to partition and sorted in order partition folders
+        """
         for dataset in self.channels:
             if channel in self.channels[dataset]:
                 partition_path = self.dataset_paths[dataset]
@@ -222,6 +239,15 @@ class HyperPlotter:
         return partition_path, sorted([os.path.basename(partition) for partition in self.fs.ls(path)])
 
     def _solve_partitions(self, channel: str, relay_data: dict) -> tuple[list[str], datetime | None, datetime | None]:
+        """Solve for partitions for a given channel and relay_data
+
+        Args:
+            channel: channel to solve for
+            relay_data: dict containing info from the plotly selection
+
+        Returns:
+            [partition solutions], start, end
+        """
         solution_paths = []
         partition_path, partitions = self.get_channel_partitions(channel)
         if (
